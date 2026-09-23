@@ -4,7 +4,8 @@ from fastapi.responses import JSONResponse
 from app.exceptions import (
     EmailAlreadyExistsError,
     InvalidCredentialsError,
-    OfficeAlreadyExistsError
+    OfficeAlreadyExistsError,
+    OfficeNotFoundError
 )
 
 
@@ -34,4 +35,12 @@ async def office_already_exists_handler(
     return JSONResponse(
         status_code=409,
         content={"detail": str(exc)},
+    )
+async def office_not_found_handler(
+        request:Request,
+        exc:OfficeNotFoundError
+):
+    return JSONResponse(
+        status_code=404,
+        content={"details":str(exc)}
     )

@@ -7,12 +7,14 @@ from app.routers import health, auth, bookings, admin
 from app.exception_handlers import (
     email_already_exists_handler,
     invalid_credentials_handler,
-    office_already_exists_handler
+    office_already_exists_handler,
+    office_not_found_handler
 )
 from app.exceptions import (
     EmailAlreadyExistsError,
     InvalidCredentialsError,
-    OfficeAlreadyExistsError
+    OfficeAlreadyExistsError,
+    OfficeNotFoundError
 )
 
 
@@ -40,6 +42,10 @@ app.add_exception_handler(
 app.add_exception_handler(
     OfficeAlreadyExistsError,
     office_already_exists_handler,
+)
+app.add_exception_handler(
+    OfficeNotFoundError,
+    office_not_found_handler
 )
 
 app.include_router(health.router)
