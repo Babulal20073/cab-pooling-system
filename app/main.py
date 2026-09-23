@@ -1,7 +1,19 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 
-app=FastAPI(title="Cab Pooling & Smart Pickup Routing")
+from app.db.init_db import init_db
+from app.routers import health, auth, bookings, admin
 
-@app.get("/health")
-def health_check():
-    return {"status":"ok"}
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+
+    yield
+
+
+app = FastAPI(
+    title="Cab Pooling & Smart Pickup Routing",
+    lifespan=lifespan,
+)
