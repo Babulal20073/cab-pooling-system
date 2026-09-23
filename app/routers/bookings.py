@@ -11,7 +11,7 @@ from app.schemas.booking import (
     BookingResponse
 )
 from app.services.booking_service import BookingService
-
+from app.services.planning_service import PlanningService
 
 router = APIRouter(prefix="/bookings",tags=["Bookings"])
 
@@ -48,8 +48,29 @@ def cancel_booking(
     current_user:Employee=Depends(get_current_user),
     db:Session=Depends(get_db)
 ):
-    service=BookingService(db)
-    return service.cancel_booking(
-        booking_id,
-        current_user,
-    )
+    booking_service = BookingService(db)
+    planning_service = PlanningService(db)
+
+    try:
+        booking, cab = booking_service.cancel_booking_and_find_cab(
+            booking_id,
+            current_user,
+        )
+
+        if cab is not None:
+
+            planning_service.remove_employee_from_cab(
+                cab_id=cab.id,
+                employee_id=booking.employee_id,
+            )
+
+            planning_service.replan_cab(cab)
+
+        db.commit()
+        db.refresh(booking)
+
+        return booking
+
+    except Exception:
+        db.rollback()
+        raise

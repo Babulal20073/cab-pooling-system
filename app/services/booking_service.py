@@ -10,6 +10,8 @@ from app.models.shift import Shift
 from app.models.employee import Employee
 from app.schemas.booking import BookingCreate
 from app.models.enums import BookingStatus
+from app.models.cab import Cab
+from app.models.stop import Stop
 
 class BookingService:
     def __init__(self,db:Session):
@@ -89,3 +91,39 @@ class BookingService:
         self.db.refresh(booking)
 
         return booking
+
+    def cancel_booking_and_find_cab(
+    self,
+    booking_id: int,
+    employee: Employee,
+) -> tuple[Booking, Cab | None]:
+
+        booking = (
+            self.db.query(Booking)
+            .filter(
+                Booking.id == booking_id,
+                Booking.employee_id == employee.id,
+            )
+            .first()
+        )
+
+        if not booking:
+            raise BookingNotFoundError("Booking not found")
+
+        if booking.status == BookingStatus.CANCELLED:
+            return booking, None
+
+        cab = (
+            self.db.query(Cab)
+            .join(Stop, Stop.cab_id == Cab.id)
+            .filter(
+                Stop.employee_id == booking.employee_id,
+                Cab.shift_id == booking.shift_id,
+                Stop.is_pickup.is_(True),
+            )
+            .first()
+        )
+
+        booking.status = BookingStatus.CANCELLED
+
+        return booking, cab

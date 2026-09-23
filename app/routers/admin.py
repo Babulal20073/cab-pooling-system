@@ -14,7 +14,7 @@ from app.services.planning_service import PlanningService
 from app.models.shift import Shift
 from app.models.office import Office
 from datetime import timedelta
-from app.exceptions import ShiftNotFoundError
+from app.exceptions import ShiftNotFoundError,BookingNotFoundError
 
 from app.schemas.planning import (
     PlanningResponse,
@@ -26,6 +26,7 @@ from app.schemas.planning import (
     PickupETA,
 )
 from app.services.routing_service import RoutingService
+from app.models.booking import Booking
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -215,3 +216,5 @@ def plan_shift(
                 "Employees clustered and routes optimized"
             ),
         )
+
+

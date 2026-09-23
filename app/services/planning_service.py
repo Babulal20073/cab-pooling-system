@@ -9,9 +9,8 @@ from dataclasses import dataclass
 from app.models.cab import Cab
 from app.models.stop import Stop
 from datetime import datetime
-
-from app.services.routing_service import RouteResult
-
+from datetime import timedelta
+from app.services.routing_service import RouteResult,RoutingService
 from app.services.spatial_service import (
     get_grid_cell,
     get_neighboring_cells,
@@ -232,3 +231,117 @@ class PlanningService:
 
 
         return cab
+
+    #finding cab and stops id for cancelled booking
+    def find_cab_for_booking(
+    self,
+    booking: Booking,
+) -> Cab | None:
+
+        stop = (
+            self.db.query(Stop)
+            .join(Cab, Stop.cab_id == Cab.id)
+            .filter(
+                Stop.employee_id == booking.employee_id,
+                Cab.shift_id == booking.shift_id,
+                Stop.is_pickup.is_(True),
+            )
+            .first()
+        )
+
+        if stop is None:
+            return None
+
+        return (
+            self.db.query(Cab)
+            .filter(Cab.id == stop.cab_id)
+            .first()
+        )
+    def get_cab_employees(
+    self,
+    cab: Cab,
+) -> list[Employee]:
+
+        stops = (
+            self.db.query(Stop)
+            .filter(
+                Stop.cab_id == cab.id,
+                Stop.is_pickup.is_(True),
+            )
+            .order_by(Stop.sequence_no)
+            .all()
+        )
+
+        return [
+            stop.employee
+            for stop in stops
+        ]
+    def replan_cab(
+    self,
+    cab: Cab,
+) -> None:
+
+        shift = cab.shift
+        office = shift.office
+
+        employees = self.get_cab_employees(cab)
+
+        # No passengers left
+        #
+        if not employees:
+            self.db.delete(cab)
+            return
+
+        routing_service = RoutingService()
+
+        route = routing_service.find_best_route(
+            employees,
+            office,
+            shift.shift_type,
+        )
+
+        route_duration = timedelta(
+            minutes=route.total_time_minutes
+        )
+
+        start_time = shift.start_time - route_duration
+
+        # Remove old stops
+        self.db.query(Stop).filter(
+            Stop.cab_id == cab.id
+        ).delete()
+
+        # Create new stops
+        for sequence_no, (employee_id, offset) in enumerate(
+            zip(
+                route.employee_ids,
+                route.pickup_offsets_minutes,
+            ),
+            start=1,
+        ):
+            pickup_time = (
+                start_time
+                + timedelta(minutes=offset)
+            )
+
+            stop = Stop(
+                cab_id=cab.id,
+                employee_id=employee_id,
+                sequence_no=sequence_no,
+                eta=pickup_time,
+                is_pickup=True,
+            )
+
+            self.db.add(stop)
+
+    def remove_employee_from_cab(
+    self,
+    cab_id: int,
+    employee_id: int,
+) -> None:
+
+        self.db.query(Stop).filter(
+            Stop.cab_id == cab_id,
+            Stop.employee_id == employee_id,
+            Stop.is_pickup.is_(True),
+        ).delete()
