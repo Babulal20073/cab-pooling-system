@@ -11,6 +11,8 @@ from app.services.shift_service import ShiftService
 
 from app.schemas.planning import PlanningResponse
 from app.services.planning_service import PlanningService
+from app.models.shift import Shift
+from app.models.office import Office
 
 
 
@@ -20,7 +22,10 @@ from app.schemas.planning import (
     NearbyEmployee,
     NearbyEmployees,
     CabGroup,
+    RouteResultResponse
 )
+from app.services.routing_service import RoutingService
+
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 @router.get("/test")
@@ -79,9 +84,9 @@ def plan_shift(
     nearby = []
     #
     for booking in bookings:
-
+        #get employees id for all the bookings
         employee = booking.employee
-
+        #find neary employees
         candidates = service.find_nearby_employees(
             employee,
             bookings,
@@ -102,6 +107,7 @@ def plan_shift(
                 ],
             )
         )
+    #now cluster those into similar groups
     cab_groups = service.create_cab_groups(
         bookings,
         capacity=4,
@@ -116,11 +122,42 @@ def plan_shift(
         )
         for group in cab_groups
     ]
+    #get the shift for getting the office id of shift
+    shift = (
+        db.query(Shift)
+        .filter(Shift.id == shift_id)
+        .first()
+    )
+
+    office = shift.office
+    routing_service = RoutingService(db)
+    #now applying routing to the office
+    routes = []
+    for group in cab_groups:
+
+        route = routing_service.find_best_route(
+            group,
+            office,
+        )
+
+        routes.append(
+            RouteResultResponse(
+                employee_ids=route.employee_ids,
+                total_distance_km=round(
+                    route.total_distance_km,
+                    3,
+                ),
+            )
+        )
+
     return PlanningResponse(
         shift_id=shift_id,
         booking_count=len(bookings),
         groups=groups,
         nearby=nearby,
         cabs=cabs,
-        message="Employees clustered into candidate cabs",
+        routes=routes,
+        message=(
+            "Employees clustered and routes optimized"
+        ),
     )

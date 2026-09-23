@@ -20,10 +20,16 @@ class CabGroup(BaseModel):
     employee_ids: list[int]
 
 
+class RouteResultResponse(BaseModel):
+    employee_ids: list[int]
+    total_distance_km: float
+    
 class PlanningResponse(BaseModel):
     shift_id: int
     booking_count: int
     groups: list[SpatialGroup]
     nearby: list[NearbyEmployees]
     cabs: list[CabGroup]
+    routes: list[RouteResultResponse]
     message: str
+
