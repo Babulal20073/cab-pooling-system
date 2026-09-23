@@ -7,6 +7,11 @@ from app.core.security import (
     hash_password,
     verify_password,
 )
+from app.exceptions import (
+    EmailAlreadyExistsError,
+    InvalidCredentialsError,
+)
+
 class AuthService:
     def __init__(self,db:Session):
         self.db=db
@@ -18,7 +23,7 @@ class AuthService:
             .first()
         )
         if existing_employee:
-            raise ValueError("Email already registered")
+            raise EmailAlreadyExistsError("Email already registered")
         employee = Employee(
             name=data.name,
             email=data.email,
@@ -40,10 +45,10 @@ class AuthService:
             .first()
         )
         if not employee:
-            raise ValueError("Invalid email or password")
+            raise InvalidCredentialsError("Invalid email or password")
 
         if not verify_password(password,employee.password_hash):
-            raise ValueError("Invalid email or password")
+            raise InvalidCredentialsError("Invalid email or password")
 
         return create_access_token(
             user_id=employee.id,
