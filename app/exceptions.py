@@ -8,3 +8,5 @@ class EmailAlreadyExistsError(AppException):
 
 class InvalidCredentialsError(AppException):
     pass
+class OfficeAlreadyExistsError(AppException):
+    pass

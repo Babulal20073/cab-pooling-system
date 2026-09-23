@@ -9,7 +9,7 @@ from app.db.base import Base
 class Office(Base):
     __tablename__="offices"
     id:Mapped[int]=mapped_column(primary_key=True)
-    name:Mapped[str]=mapped_column(String(100))
+    name:Mapped[str]=mapped_column(String(100),unique=True)
     lat:Mapped[float]
     lng:Mapped[float]
 
