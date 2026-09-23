@@ -83,12 +83,20 @@ EMPLOYEES = [
 ]
 
 
+NIGHT_EMPLOYEE_EMAILS = {
+    "seed1@example.com",
+    "seed2@example.com",
+    "seed3@example.com",
+    "seed4@example.com",
+}
+
+
 def seed_data():
     db = SessionLocal()
 
     try:
         # --------------------------------------------------
-        # 1. Find the office
+        # 1. Find or create office
         # --------------------------------------------------
         office = (
             db.query(Office)
@@ -107,12 +115,14 @@ def seed_data():
             db.commit()
             db.refresh(office)
 
-        print(f"Office: {office.name} (id={office.id})")
+            print(f"Created office: {office.name} (id={office.id})")
+        else:
+            print(f"Office already exists: {office.name} (id={office.id})")
 
         # --------------------------------------------------
-        # 2. Find or create shift
+        # 2. Find or create DAY shift
         # --------------------------------------------------
-        shift = (
+        day_shift = (
             db.query(Shift)
             .filter(
                 Shift.office_id == office.id,
@@ -122,21 +132,51 @@ def seed_data():
             .first()
         )
 
-        if not shift:
-            shift = Shift(
+        if not day_shift:
+            day_shift = Shift(
                 office_id=office.id,
                 start_time=datetime(2026, 9, 24, 9, 0),
                 shift_type=ShiftType.DAY,
             )
 
-            db.add(shift)
+            db.add(day_shift)
             db.commit()
-            db.refresh(shift)
+            db.refresh(day_shift)
 
-        print(f"Shift: {shift.id}")
+            print(f"Created day shift: {day_shift.id}")
+        else:
+            print(f"Day shift already exists: {day_shift.id}")
 
         # --------------------------------------------------
-        # 3. Create employees and bookings
+        # 3. Find or create NIGHT shift
+        # --------------------------------------------------
+        night_shift = (
+            db.query(Shift)
+            .filter(
+                Shift.office_id == office.id,
+                Shift.start_time == datetime(2026, 9, 25, 22, 0),
+                Shift.shift_type == ShiftType.NIGHT,
+            )
+            .first()
+        )
+
+        if not night_shift:
+            night_shift = Shift(
+                office_id=office.id,
+                start_time=datetime(2026, 9, 25, 22, 0),
+                shift_type=ShiftType.NIGHT,
+            )
+
+            db.add(night_shift)
+            db.commit()
+            db.refresh(night_shift)
+
+            print(f"Created night shift: {night_shift.id}")
+        else:
+            print(f"Night shift already exists: {night_shift.id}")
+
+        # --------------------------------------------------
+        # 4. Create employees
         # --------------------------------------------------
         password = hash_password("SeedPassword123!")
 
@@ -173,30 +213,81 @@ def seed_data():
                     f"{employee.name} (id={employee.id})"
                 )
 
-            # ----------------------------------------------
-            # Create booking if it doesn't already exist
-            # ----------------------------------------------
-            booking = (
+            # --------------------------------------------------
+            # Create DAY booking
+            # --------------------------------------------------
+            day_booking = (
                 db.query(Booking)
                 .filter(
                     Booking.employee_id == employee.id,
-                    Booking.shift_id == shift.id,
+                    Booking.shift_id == day_shift.id,
                 )
                 .first()
             )
 
-            if not booking:
-                booking = Booking(
+            if not day_booking:
+                day_booking = Booking(
                     employee_id=employee.id,
-                    shift_id=shift.id,
+                    shift_id=day_shift.id,
                     status=BookingStatus.ACTIVE,
                 )
 
-                db.add(booking)
+                db.add(day_booking)
                 db.commit()
 
                 print(
-                    f"  → Created booking for "
+                    f"  → Created day booking for "
+                    f"{employee.name}"
+                )
+            else:
+                print(
+                    f"  → Day booking already exists for "
+                    f"{employee.name}"
+                )
+
+        # --------------------------------------------------
+        # 5. Create NIGHT bookings for employees 1-4
+        # --------------------------------------------------
+        for email in NIGHT_EMPLOYEE_EMAILS:
+
+            employee = (
+                db.query(Employee)
+                .filter(Employee.email == email)
+                .first()
+            )
+
+            if not employee:
+                print(
+                    f"Warning: employee {email} not found"
+                )
+                continue
+
+            night_booking = (
+                db.query(Booking)
+                .filter(
+                    Booking.employee_id == employee.id,
+                    Booking.shift_id == night_shift.id,
+                )
+                .first()
+            )
+
+            if not night_booking:
+                night_booking = Booking(
+                    employee_id=employee.id,
+                    shift_id=night_shift.id,
+                    status=BookingStatus.ACTIVE,
+                )
+
+                db.add(night_booking)
+                db.commit()
+
+                print(
+                    f"  → Created night booking for "
+                    f"{employee.name}"
+                )
+            else:
+                print(
+                    f"  → Night booking already exists for "
                     f"{employee.name}"
                 )
 

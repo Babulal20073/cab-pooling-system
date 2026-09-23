@@ -5,14 +5,13 @@ from app.exceptions import (
     EmailAlreadyExistsError,
     InvalidCredentialsError,
     OfficeAlreadyExistsError,
-    OfficeNotFoundError
-)
-#excpetion related to bookingss
-from app.exceptions import (
+    OfficeNotFoundError,
     ShiftNotFoundError,
     DuplicateBookingError,
     BookingNotFoundError,
+    NoValidRouteError,
 )
+
 
 async def email_already_exists_handler(
     request: Request,
@@ -33,6 +32,7 @@ async def invalid_credentials_handler(
         content={"detail": str(exc)},
     )
 
+
 async def office_already_exists_handler(
     request: Request,
     exc: OfficeAlreadyExistsError,
@@ -41,38 +41,53 @@ async def office_already_exists_handler(
         status_code=409,
         content={"detail": str(exc)},
     )
+
+
 async def office_not_found_handler(
-        request:Request,
-        exc:OfficeNotFoundError
+    request: Request,
+    exc: OfficeNotFoundError,
 ):
     return JSONResponse(
         status_code=404,
-        content={"detail":str(exc)}
+        content={"detail": str(exc)},
     )
+
 
 async def shift_not_found_handler(
-        request:Request,
-        exc:ShiftNotFoundError
+    request: Request,
+    exc: ShiftNotFoundError,
 ):
     return JSONResponse(
         status_code=404,
-        content={"detail":str(exc)}
+        content={"detail": str(exc)},
     )
 
+
 async def duplicate_booking_handler(
-        request:Request,
-        exc:DuplicateBookingError
+    request: Request,
+    exc: DuplicateBookingError,
 ):
     return JSONResponse(
         status_code=409,
-        content={"detail":str(exc)}
+        content={"detail": str(exc)},
     )
 
+
 async def booking_not_found_handler(
-        request:Request,
-        exc:BookingNotFoundError,
+    request: Request,
+    exc: BookingNotFoundError,
 ):
     return JSONResponse(
         status_code=404,
-        content={"detail":str(exc)}
+        content={"detail": str(exc)},
+    )
+
+
+async def no_valid_route_handler(
+    request: Request,
+    exc: NoValidRouteError,
+):
+    return JSONResponse(
+        status_code=422,
+        content={"detail": str(exc)},
     )

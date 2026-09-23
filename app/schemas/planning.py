@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-
+from datetime import datetime
 
 class SpatialGroup(BaseModel):
     cell: tuple[int, int]
@@ -20,9 +20,16 @@ class CabGroup(BaseModel):
     employee_ids: list[int]
 
 
+
+class PickupETA(BaseModel):
+    employee_id: int
+    pickup_eta: datetime
+
 class RouteResultResponse(BaseModel):
     employee_ids: list[int]
     total_distance_km: float
+    total_time_minutes: float
+    pickup_etas: list[PickupETA]
     
 class PlanningResponse(BaseModel):
     shift_id: int

@@ -6,6 +6,11 @@ from app.models.booking import Booking
 from app.models.enums import BookingStatus
 from app.models.employee import Employee
 from dataclasses import dataclass
+from app.models.cab import Cab
+from app.models.stop import Stop
+from datetime import datetime
+
+from app.services.routing_service import RouteResult
 
 from app.services.spatial_service import (
     get_grid_cell,
@@ -180,5 +185,50 @@ class PlanningService:
 
             cab_groups.append(group)
         return cab_groups
+    def clear_existing_plan(self, shift_id: int):
+        existing_cabs = (
+            self.db.query(Cab)
+            .filter(Cab.shift_id == shift_id)
+            .all()
+        )
 
-#but currently it's not doing effect of each candiate on selected neighbour candidate rather then centered or first chose candidate
+        for cab in existing_cabs:
+            self.db.query(Stop).filter(
+                Stop.cab_id == cab.id
+            ).delete()
+
+            self.db.delete(cab)
+
+    def save_route(
+    self,
+    shift_id: int,
+    employee_ids: list[int],
+    pickup_etas: list[datetime],
+    capacity: int = 4,
+) -> Cab:
+
+        cab = Cab(
+            shift_id=shift_id,
+            capacity=capacity,
+            guard_assigned=False,
+        )
+
+        self.db.add(cab)
+        self.db.flush()
+
+        for sequence_no, (employee_id, pickup_eta) in enumerate(
+            zip(employee_ids, pickup_etas),
+            start=1,
+        ):
+            stop = Stop(
+                cab_id=cab.id,
+                employee_id=employee_id,
+                sequence_no=sequence_no,
+                eta=pickup_eta,
+                is_pickup=True,
+            )
+
+            self.db.add(stop)
+
+
+        return cab

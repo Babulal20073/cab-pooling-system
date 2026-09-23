@@ -4,23 +4,28 @@ from fastapi import FastAPI
 
 from app.db.init_db import init_db
 from app.routers import health, auth, bookings, admin
-from app.exception_handlers import (
-    email_already_exists_handler,
-    invalid_credentials_handler,
-    office_already_exists_handler,
-    office_not_found_handler,
-    booking_not_found_handler,
-    duplicate_booking_handler,
-    shift_not_found_handler
-)
+from fastapi import FastAPI
+
 from app.exceptions import (
     EmailAlreadyExistsError,
     InvalidCredentialsError,
     OfficeAlreadyExistsError,
     OfficeNotFoundError,
     ShiftNotFoundError,
+    DuplicateBookingError,
     BookingNotFoundError,
-    DuplicateBookingError
+    NoValidRouteError,
+)
+
+from app.exception_handlers import (
+    email_already_exists_handler,
+    invalid_credentials_handler,
+    office_already_exists_handler,
+    office_not_found_handler,
+    shift_not_found_handler,
+    duplicate_booking_handler,
+    booking_not_found_handler,
+    no_valid_route_handler,
 )
 
 
@@ -35,7 +40,6 @@ app = FastAPI(
     title="Cab Pooling & Smart Pickup Routing",
     lifespan=lifespan,
 )
-
 app.add_exception_handler(
     EmailAlreadyExistsError,
     email_already_exists_handler,
@@ -45,27 +49,36 @@ app.add_exception_handler(
     InvalidCredentialsError,
     invalid_credentials_handler,
 )
+
 app.add_exception_handler(
     OfficeAlreadyExistsError,
     office_already_exists_handler,
 )
+
 app.add_exception_handler(
     OfficeNotFoundError,
-    office_not_found_handler
-)
-app.add_exception_handler(
-    ShiftNotFoundError,
-    shift_not_found_handler
-)
-app.add_exception_handler(
-    BookingNotFoundError,
-    booking_not_found_handler
-)
-app.add_exception_handler(
-    DuplicateBookingError,
-    duplicate_booking_handler
+    office_not_found_handler,
 )
 
+app.add_exception_handler(
+    ShiftNotFoundError,
+    shift_not_found_handler,
+)
+
+app.add_exception_handler(
+    DuplicateBookingError,
+    duplicate_booking_handler,
+)
+
+app.add_exception_handler(
+    BookingNotFoundError,
+    booking_not_found_handler,
+)
+
+app.add_exception_handler(
+    NoValidRouteError,
+    no_valid_route_handler,
+)
 
 app.include_router(health.router)
 app.include_router(auth.router)
