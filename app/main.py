@@ -17,3 +17,8 @@ app = FastAPI(
     title="Cab Pooling & Smart Pickup Routing",
     lifespan=lifespan,
 )
+
+app.include_router(health.router)
+app.include_router(auth.router)
+app.include_router(bookings.router)
+app.include_router(admin.router)
