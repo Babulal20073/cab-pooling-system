@@ -21,12 +21,33 @@ router = APIRouter(prefix="/bookings",tags=["Bookings"])
     status_code=201
 )
 def create_booking(
-    data:BookingCreate,
-    current_user:Employee=Depends(get_current_user),
-    db:Session=Depends(get_db)
+    data: BookingCreate,
+    current_user: Employee = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
-    service=BookingService(db)
-    return service.create_booking(data,current_user)
+    booking_service = BookingService(db)
+    planning_service = PlanningService(db)
+
+    try:
+        booking = booking_service.create_booking(
+            data,
+            current_user,
+        )
+
+        db.flush()
+
+        planning_service.try_assign_late_booking(
+            booking
+        )
+
+        db.commit()
+        db.refresh(booking)
+
+        return booking
+
+    except Exception:
+        db.rollback()
+        raise
 
 @router.get(
     "",

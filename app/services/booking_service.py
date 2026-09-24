@@ -54,8 +54,6 @@ class BookingService:
             shift_id=data.shift_id,
         )
         self.db.add(booking)
-        self.db.commit()
-        self.db.refresh(booking)
         return booking
     def get_my_bookings(self,employee:Employee)->list[Booking]:
         return (

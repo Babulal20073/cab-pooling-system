@@ -9,12 +9,10 @@ from app.services.office_service import OfficeService
 from app.schemas.shift import ShiftResponse,ShiftCreate
 from app.services.shift_service import ShiftService
 
-from app.schemas.planning import PlanningResponse
 from app.services.planning_service import PlanningService
 from app.models.shift import Shift
-from app.models.office import Office
 from datetime import timedelta
-from app.exceptions import ShiftNotFoundError,BookingNotFoundError
+from app.exceptions import ShiftNotFoundError
 
 from app.schemas.planning import (
     PlanningResponse,
@@ -26,7 +24,6 @@ from app.schemas.planning import (
     PickupETA,
 )
 from app.services.routing_service import RoutingService
-from app.models.booking import Booking
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -81,11 +78,10 @@ def plan_shift(
     #clear previously generated plans
     try:
         service.clear_existing_plan(shift_id)
-
         bookings = service.get_active_bookings(shift_id)
+        spatial_index = service.group_by_spatial_cell(bookings)
 
-        spatial_groups = service.group_by_spatial_cell(bookings)
-
+        spatial_groups = spatial_index
         groups = [
             SpatialGroup(
                 cell=cell,
@@ -105,7 +101,7 @@ def plan_shift(
             #find neary employees
             candidates = service.find_nearby_employees(
                 employee,
-                bookings,
+                spatial_groups,
             )
 
             nearby.append(

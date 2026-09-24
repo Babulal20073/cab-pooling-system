@@ -1,7 +1,7 @@
 from collections import defaultdict
 
 from sqlalchemy.orm import Session
-
+from app.exceptions import NoValidRouteError
 from app.models.booking import Booking
 from app.models.enums import BookingStatus
 from app.models.employee import Employee
@@ -68,49 +68,41 @@ class PlanningService:
     def find_nearby_employees(
     self,
     employee: Employee,
-    bookings: list[Booking],
-    ) -> list[NearbyCandidate]:
-
+    spatial_index: dict[tuple[int, int], list[Employee]],
+) -> list[NearbyCandidate]:
         employee_cell = get_grid_cell(
             employee.home_lat,
             employee.home_lng,
         )
 
-        neighboring_cells = set(
-            get_neighboring_cells(employee_cell)
+        neighboring_cells = get_neighboring_cells(
+            employee_cell
         )
 
         candidates = []
 
-        for booking in bookings:
+        for cell in neighboring_cells:
 
-            candidate = booking.employee
+            for candidate in spatial_index.get(cell, []):
 
-            if candidate.id == employee.id:
-                continue
+                if candidate.id == employee.id:
+                    continue
 
-            candidate_cell = get_grid_cell(
-                candidate.home_lat,
-                candidate.home_lng,
-            )
-
-            if candidate_cell not in neighboring_cells:
-                continue
-
-            distance = haversine_distance(
-                employee.home_lat,
-                employee.home_lng,
-                candidate.home_lat,
-                candidate.home_lng,
-            )
-
-            if distance <= MAX_CANDIDATE_DISTANCE_KM:
-                candidates.append(
-                    NearbyCandidate(
-                        employee=candidate,
-                        distance_km=distance,
-                    )
+                distance = haversine_distance(
+                    employee.home_lat,
+                    employee.home_lng,
+                    candidate.home_lat,
+                    candidate.home_lng,
                 )
+
+                if distance <= MAX_CANDIDATE_DISTANCE_KM:
+
+                    candidates.append(
+                        NearbyCandidate(
+                            employee=candidate,
+                            distance_km=distance,
+                        )
+                    )
 
         candidates.sort(
             key=lambda candidate: candidate.distance_km
@@ -123,17 +115,21 @@ class PlanningService:
             bookings:list[Booking],
             capacity:int=4,
     )->list[list[Employee]]:
+
         employees = [
             booking.employee
             for booking in bookings
         ]
-        nearby_map={}
+
+        spatial_index = self.group_by_spatial_cell(bookings)
+
+        nearby_map = {}
 
         for employee in employees:
-            nearby_map[employee.id]=(
+            nearby_map[employee.id] = (
                 self.find_nearby_employees(
                     employee,
-                    bookings
+                    spatial_index
                 )
             )
 
@@ -345,3 +341,104 @@ class PlanningService:
             Stop.employee_id == employee_id,
             Stop.is_pickup.is_(True),
         ).delete()
+
+    def try_assign_late_booking(
+    self,
+    booking: Booking,
+) -> Cab | None:
+
+        shift = booking.shift
+        employee = booking.employee
+
+        # Existing cabs for this shift
+        cabs = (
+            self.db.query(Cab)
+            .filter(Cab.shift_id == shift.id)
+            .all()
+        )
+
+        routing_service = RoutingService()
+
+        best_cab = None
+        best_route = None
+
+        for cab in cabs:
+
+            # 1. Capacity check
+            employees = self.get_cab_employees(cab)
+
+            if len(employees) >= cab.capacity:
+                continue
+
+            # 2. Spatial compatibility
+            is_nearby = any(
+                haversine_distance(
+                    employee.home_lat,
+                    employee.home_lng,
+                    existing.home_lat,
+                    existing.home_lng,
+                ) <= MAX_CANDIDATE_DISTANCE_KM
+                for existing in employees
+            )
+
+            if employees and not is_nearby:
+                continue
+
+            # 3. Try routing with the new employee
+            candidate_employees = employees + [employee]
+
+            try:
+                route = routing_service.find_best_route(
+                    candidate_employees,
+                    shift.office,
+                    shift.shift_type,
+                )
+            except NoValidRouteError:
+                continue
+
+            # 4. Keep the shortest valid resulting route
+            if (
+                best_route is None
+                or route.total_distance_km
+                < best_route.total_distance_km
+            ):
+                best_cab = cab
+                best_route = route
+
+        if best_cab is None:
+            return None
+
+        # Rebuild only the selected cab's stops
+        route_duration = timedelta(
+            minutes=best_route.total_time_minutes
+        )
+
+        start_time = shift.start_time - route_duration
+
+        self.db.query(Stop).filter(
+            Stop.cab_id == best_cab.id
+        ).delete()
+
+        for sequence_no, (employee_id, offset) in enumerate(
+            zip(
+                best_route.employee_ids,
+                best_route.pickup_offsets_minutes,
+            ),
+            start=1,
+        ):
+            pickup_time = (
+                start_time
+                + timedelta(minutes=offset)
+            )
+
+            self.db.add(
+                Stop(
+                    cab_id=best_cab.id,
+                    employee_id=employee_id,
+                    sequence_no=sequence_no,
+                    eta=pickup_time,
+                    is_pickup=True,
+                )
+            )
+
+        return best_cab
